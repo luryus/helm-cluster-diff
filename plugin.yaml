@@ -1,0 +1,9 @@
+name: clusterdiff
+version: "0.1.0"
+usage: Check for changes made outside of helm
+description: |-
+      A Helm plugin that helps find manual changes done to resources
+ignoreFlags: false
+useTunnel: true
+command: "$HELM_PLUGIN_DIR/helm-clusterdiff"
+
