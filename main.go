@@ -10,6 +10,7 @@ import (
 
 	difflib "github.com/aryann/difflib"
 	funk "github.com/thoas/go-funk"
+	kingpin "gopkg.in/alecthomas/kingpin.v2"
 	yaml "gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -34,14 +35,9 @@ const ansiReset = ansiControlSequenceStart + "0m"
 const ansiColorRed = ansiControlSequenceStart + "91m"
 const ansiColorGreen = ansiControlSequenceStart + "92m"
 
-func getReleaseNameArgument() string {
-	if len(os.Args) != 2 {
-		fmt.Printf("Usage: %s <release>\n", os.Args[0])
-		os.Exit(1)
-	}
-
-	return os.Args[1]
-}
+var (
+	releaseName = kingpin.Arg("release", "Helm release to diff").Required().String()
+)
 
 func getRelease(releaseName string) (*helm_release.Release, error) {
 	tillerHost, found := os.LookupEnv("TILLER_HOST")
@@ -203,7 +199,9 @@ func diffResources(releaseResource map[string]interface{}, clusterResource map[s
 }
 
 func main() {
-	release, err := getRelease(getReleaseNameArgument())
+	kingpin.Parse()
+
+	release, err := getRelease(*releaseName)
 	if err != nil {
 		log.Fatal("Getting Helm release failed: ", err)
 	}
