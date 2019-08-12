@@ -27,7 +27,7 @@ type parsedManifest struct {
 	apiVersion string
 	kind       string
 	name       string
-	manifest   map[string]interface{}
+	manifest   *unstructured.Unstructured
 }
 
 const ansiControlSequenceStart = "\x1B["
@@ -36,7 +36,8 @@ const ansiColorRed = ansiControlSequenceStart + "91m"
 const ansiColorGreen = ansiControlSequenceStart + "92m"
 
 var (
-	releaseName = kingpin.Arg("release", "Helm release to diff").Required().String()
+	releaseName       = kingpin.Arg("release", "Helm release to diff").Required().String()
+	keepCommonChanges = kingpin.Flag("keep-common-changes", "Do not remove commonly differing lines").Bool()
 )
 
 func getRelease(releaseName string) (*helm_release.Release, error) {
@@ -137,7 +138,7 @@ func parseManifest(manifest string) ([]parsedManifest, error) {
 	parsed := make([]parsedManifest, 0)
 
 	for {
-		m := make(map[string]interface{})
+		m := make(map[interface{}]interface{})
 		err := decoder.Decode(m)
 
 		if err != nil {
@@ -152,25 +153,37 @@ func parseManifest(manifest string) ([]parsedManifest, error) {
 			continue
 		}
 
+		strMap, err := convertToStringMap(m)
+
+		mfst := &unstructured.Unstructured{}
+		mfst.SetUnstructuredContent(strMap)
 		parsed = append(parsed, parsedManifest{
-			apiVersion: m["apiVersion"].(string),
-			kind:       m["kind"].(string),
-			name:       m["metadata"].(map[interface{}]interface{})["name"].(string),
-			manifest:   m,
+			apiVersion: mfst.GetAPIVersion(),
+			kind:       mfst.GetKind(),
+			name:       mfst.GetName(),
+			manifest:   mfst,
 		})
 	}
 
 	return parsed, nil
 }
 
+var nonDeterministicFields = [][]string{
+	[]string{"status"},
+	[]string{"metadata", "creationTimestamp"},
+	[]string{"metadata", "deletionTimestamp"},
+	[]string{"metadata", "selfLink"},
+	[]string{"metadata", "resourceVersion"},
+	[]string{"metadata", "generation"},
+	[]string{"metadata", "uid"},
+	[]string{"metadata", "namespace"},
+}
+
 func diffResources(releaseResource map[string]interface{}, clusterResource map[string]interface{}) {
-	// remove things from the kube resource
-	delete(clusterResource, "status")
-	if funk.Contains(clusterResource, "metadata") {
-		delete(clusterResource["metadata"].(map[string]interface{}), "creationTimestamp")
-		delete(clusterResource["metadata"].(map[string]interface{}), "uid")
-		delete(clusterResource["metadata"].(map[string]interface{}), "selfLink")
-		delete(clusterResource["metadata"].(map[string]interface{}), "resourceVersion")
+	if !*keepCommonChanges {
+		for _, f := range nonDeterministicFields {
+			unstructured.RemoveNestedField(clusterResource, f...)
+		}
 	}
 
 	releaseBytes, err := yaml.Marshal(releaseResource)
@@ -235,6 +248,8 @@ func main() {
 
 	for i := range releaseResources {
 		fmt.Println("===", releaseResources[i].kind, releaseResources[i].name, "===")
-		diffResources(releaseResources[i].manifest, clusterResources[i].UnstructuredContent())
+		diffResources(
+			releaseResources[i].manifest.UnstructuredContent(),
+			clusterResources[i].UnstructuredContent())
 	}
 }

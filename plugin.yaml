@@ -1,9 +1,9 @@
-name: clusterdiff
+name: cluster-diff
 version: "0.1.0"
-usage: Check for changes made outside of helm
+usage: Compare the Helm release state and the actual resource state
 description: |-
-      A Helm plugin that helps find manual changes done to resources
+      A Helm plugin that helps find manual changes done to resources.
 ignoreFlags: false
 useTunnel: true
-command: "$HELM_PLUGIN_DIR/helm-clusterdiff"
+command: "$HELM_PLUGIN_DIR/helm-cluster-diff"
 

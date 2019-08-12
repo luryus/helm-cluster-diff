@@ -1,4 +1,4 @@
-module helm-clusterdiff
+module helm-cluster-diff
 
 go 1.12
 
